@@ -1,0 +1,217 @@
+services:
+    auth-service:
+        container_name: auth-service
+        build:
+            context: "./docker/8.4"
+            dockerfile: Dockerfile
+            args:
+                WWWGROUP: "${WWWGROUP}"
+        image: "sail-8.4/app"
+        extra_hosts:
+            - "host.docker.internal:host-gateway"
+        ports:
+            - "${AUTH_SERVICE_APP_PORT:-80}:80"
+            - "${VITE_PORT:-5173}:${VITE_PORT:-5173}"
+        environment:
+            WWWUSER: "${WWWUSER}"
+            LARAVEL_SAIL: 1
+            XDEBUG_MODE: "${SAIL_XDEBUG_MODE:-off}"
+            XDEBUG_CONFIG: "${SAIL_XDEBUG_CONFIG:-client_host=host.docker.internal}"
+            IGNITION_LOCAL_SITES_PATH: "${PWD}/auth-service"
+            # frankenphp
+            # SUPERVISOR_PHP_COMMAND: "/usr/bin/php -d variables_order=EGPCS /var/www/html/artisan octane:frankenphp --host=0.0.0.0 --admin-port=2019 --port=80"
+            # XDG_CONFIG_HOME: /var/www/html/config
+            # XDG_DATA_HOME: /var/www/html/data
+        volumes:
+            - "./auth-service:/var/www/html"
+        networks:
+            - app
+        labels:
+            - traefik.enable=true
+
+            # Middleware to strip /auth-service prefix
+            - traefik.http.middlewares.auth-service-strip.stripprefix.prefixes=/auth-service
+            - traefik.http.middlewares.auth-service-strip.stripprefix.forceSlash=false
+
+            # HTTP router
+            - traefik.http.routers.auth-service.rule=PathPrefix(`/auth-service`)
+            - traefik.http.routers.auth-service.entrypoints=web
+            - traefik.http.routers.auth-service.middlewares=auth-service-strip
+
+            # HTTPS router
+            # - traefik.http.routers.auth-service-https.tls=true
+            # - traefik.http.routers.auth-service-https.rule=PathPrefix(`/auth-service`)
+            # - traefik.http.routers.auth-service-https.entrypoints=websecure
+            # - traefik.http.routers.auth-service-https.tls.certresolver=cloudflare
+            # - traefik.http.routers.auth-service-https.middlewares=auth-service-strip
+        depends_on:
+            - auth-service-pgsql
+            - auth-service-redis
+    auth-service-pgsql:
+        image: "postgres:17"
+        ports:
+            - "${AUTH_SERVICE_FORWARD_DB_PORT:-5432}:5432"
+        environment:
+            PGPASSWORD: "${AUTH_SERVICE_DB_PASSWORD:-secret}"
+            POSTGRES_DB: "${AUTH_SERVICE_DB_DATABASE}"
+            POSTGRES_USER: "${AUTH_SERVICE_DB_USERNAME}"
+            POSTGRES_PASSWORD: "${AUTH_SERVICE_DB_PASSWORD:-secret}"
+        volumes:
+            - "auth-service-pgsql:/var/lib/postgresql/data"
+            - "./auth-service/vendor/laravel/sail/database/pgsql/create-testing-database.sql:/docker-entrypoint-initdb.d/10-create-testing-database.sql"
+        networks:
+            - app
+        healthcheck:
+            test:
+                - CMD
+                - pg_isready
+                - "-q"
+                - "-d"
+                - "${AUTH_SERVICE_DB_DATABASE}"
+                - "-U"
+                - "${AUTH_SERVICE_DB_USERNAME}"
+            retries: 3
+            timeout: 5s
+    auth-service-redis:
+        image: "redis:alpine"
+        ports:
+            - "${AUTH_SERVICE_FORWARD_REDIS_PORT:-6379}:6379"
+        volumes:
+            - "auth-service-redis:/data"
+        networks:
+            - app
+        healthcheck:
+            test:
+                - CMD
+                - redis-cli
+                - ping
+            retries: 3
+            timeout: 5s
+
+    user-service:
+        container_name: user-service
+        build:
+            context: "./docker/8.4"
+            dockerfile: Dockerfile
+            args:
+                WWWGROUP: "${WWWGROUP}"
+        image: "sail-8.4/app"
+        extra_hosts:
+            - "host.docker.internal:host-gateway"
+        ports:
+            - "${USER_SERVICE_APP_PORT:-80}:80"
+            - "${USER_SERVICE_VITE_PORT:-5173}:${USER_SERVICE_VITE_PORT:-5173}"
+        environment:
+            WWWUSER: "${WWWUSER}"
+            LARAVEL_SAIL: 1
+            XDEBUG_MODE: "${SAIL_XDEBUG_MODE:-off}"
+            XDEBUG_CONFIG: "${SAIL_XDEBUG_CONFIG:-client_host=host.docker.internal}"
+            IGNITION_LOCAL_SITES_PATH: "${PWD}/user-service"
+            # frankenphp
+            # SUPERVISOR_PHP_COMMAND: "/usr/bin/php -d variables_order=EGPCS /var/www/html/artisan octane:frankenphp --host=0.0.0.0 --admin-port=2019 --port=80"
+            # XDG_CONFIG_HOME: /var/www/html/config
+            # XDG_DATA_HOME: /var/www/html/data
+        volumes:
+            - "./user-service:/var/www/html"
+        networks:
+            - app
+        labels:
+            - traefik.enable=true
+
+            # Middleware to strip /auth-service prefix
+            - traefik.http.middlewares.user-service-strip.stripprefix.prefixes=/user-service
+            - traefik.http.middlewares.user-service-strip.stripprefix.forceSlash=false
+
+            # HTTP router
+            - traefik.http.routers.user-service.rule=PathPrefix(`/user-service`)
+            - traefik.http.routers.user-service.entrypoints=web
+            - traefik.http.routers.user-service.middlewares=user-service-strip
+
+            # HTTPS router
+            # - traefik.http.routers.user-service-https.tls=true
+            # - traefik.http.routers.user-service-https.rule=PathPrefix(`/user-service`)
+            # - traefik.http.routers.user-service-https.entrypoints=websecure
+            # - traefik.http.routers.user-service-https.tls.certresolver=cloudflare
+            # - traefik.http.routers.user-service-https.middlewares=user-service-strip
+        depends_on:
+            - user-service-pgsql
+            - user-service-redis
+    user-service-pgsql:
+        image: "postgres:17"
+        ports:
+            - "${USER_SERVICE_FORWARD_DB_PORT:-5432}:5432"
+        environment:
+            PGPASSWORD: "${USER_SERVICE_DB_PASSWORD:-secret}"
+            POSTGRES_DB: "${USER_SERVICE_DB_DATABASE}"
+            POSTGRES_USER: "${USER_SERVICE_DB_USERNAME}"
+            POSTGRES_PASSWORD: "${USER_SERVICE_DB_PASSWORD:-secret}"
+        volumes:
+            - "user-service-pgsql:/var/lib/postgresql/data"
+            - "./user-service/vendor/laravel/sail/database/pgsql/create-testing-database.sql:/docker-entrypoint-initdb.d/10-create-testing-database.sql"
+        networks:
+            - app
+        healthcheck:
+            test:
+                - CMD
+                - pg_isready
+                - "-q"
+                - "-d"
+                - "${USER_SERVICE_DB_DATABASE}"
+                - "-U"
+                - "${USER_SERVICE_DB_USERNAME}"
+            retries: 3
+            timeout: 5s
+    user-service-redis:
+        image: "redis:alpine"
+        ports:
+            - "${USER_SERVICE_FORWARD_REDIS_PORT:-6379}:6379"
+        volumes:
+            - "user-service-redis:/data"
+        networks:
+            - app
+        healthcheck:
+            test:
+                - CMD
+                - redis-cli
+                - ping
+            retries: 3
+            timeout: 5s
+
+    rabbitmq:
+        image: rabbitmq:3-management
+        ports:
+            - "${RABBITMQ_AMQP_FORWARD_PORT:-5672}:5672"
+            - "${RABBITMQ_UI_FORWARD_PORT:-15672}:15672"
+        environment:
+            RABBITMQ_DEFAULT_USER: "${RABBITMQ_USERNAME}"
+            RABBITMQ_DEFAULT_PASS: "${RABBITMQ_PASSWORD}"
+        networks:
+            - app
+
+    traefik:
+        image: traefik:v3.3
+        ports:
+            - "${TRAEFIK_HTTP_PORT}:80"
+            - "${TRAEFIK_HTTPS_PORT}:443"
+            - "${TRAEFIK_DASHBOARD_PORT}:8080"
+        environment:
+            - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
+        volumes:
+            - /var/run/docker.sock:/var/run/docker.sock:ro
+            - ./docker/config/traefik.yml:/etc/traefik/traefik.yml:ro
+        networks:
+            - app
+
+networks:
+    app:
+        driver: bridge
+
+volumes:
+    auth-service-pgsql:
+        driver: local
+    auth-service-redis:
+        driver: local
+    user-service-pgsql:
+        driver: local
+    user-service-redis:
+        driver: local
