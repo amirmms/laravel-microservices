@@ -8,7 +8,8 @@ use PhpAmqpLib\Channel\AMQPChannel;
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
 
-class RabbitMQService {
+class RabbitMQService
+{
     private AMQPStreamConnection $connection;
     private AbstractChannel|AMQPChannel $channel;
     private string $queue;

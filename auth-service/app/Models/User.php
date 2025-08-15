@@ -12,16 +12,16 @@ use Illuminate\Notifications\Notifiable;
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable,HasApiTokens;
+    use HasFactory, Notifiable, HasApiTokens;
 
     protected static function booted(): void
     {
         static::created(function (User $user) {
-            SyncUser::dispatch($user,ActionType::Create);
+            SyncUser::dispatch($user, ActionType::Create);
         });
 
         static::updated(function (User $user) {
-            SyncUser::dispatch($user,ActionType::Update);
+            SyncUser::dispatch($user, ActionType::Update);
         });
     }
 

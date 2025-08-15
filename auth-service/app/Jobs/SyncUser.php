@@ -16,10 +16,9 @@ class SyncUser implements ShouldQueue
      * Create a new job instance.
      */
     public function __construct(
-         public User $user,
-         public ActionType $actionType,
-    )
-    {}
+        public User $user,
+        public ActionType $actionType,
+    ) {}
 
     /**
      * Execute the job.
@@ -29,6 +28,7 @@ class SyncUser implements ShouldQueue
     {
         $payload = [
             'action_type' => $this->actionType->name,
+            'class' => $this->user::class,
             'user' => $this->user,
         ];
 

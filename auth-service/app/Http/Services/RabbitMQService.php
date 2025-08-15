@@ -8,7 +8,8 @@ use PhpAmqpLib\Channel\AMQPChannel;
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
 
-class RabbitMQService {
+class RabbitMQService
+{
     private AMQPStreamConnection $connection;
     private AbstractChannel|AMQPChannel $channel;
     private string $queue;
@@ -50,17 +51,12 @@ class RabbitMQService {
     /**
      * @throws Exception
      */
-    public function consume(): void
+    public function consume($callback, int $ttl = 55): void
     {
-        $callback = function ($msg) {
-            $data = json_decode($msg->body, true);
-
-            dump('RABBITMQ Message: ' . $msg->body);
-        };
-
         $this->channel->basic_consume($this->queue, '', false, true, false, false, $callback);
 
-        while ($this->channel->is_consuming()) {
+        $start = microtime(true);
+        while ($this->channel->is_consuming() && (microtime(true) - $start) < $ttl) {
             $this->channel->wait();
         }
     }
