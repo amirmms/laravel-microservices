@@ -35,8 +35,6 @@ class ConsumeSyncModels extends Command
      */
     public function handle()
     {
-        Log::info('Starting the ConsumeSyncModels command scheduling.');
-
         if (Cache::get($this->cacheKey, false) == true) {
             return;
         }
@@ -48,8 +46,6 @@ class ConsumeSyncModels extends Command
         $mq = new RabbitMQService();
 
         $callback = function ($msg) {
-            $this->alert('got new msg from rabbit');
-
             $data = json_decode($msg->body, true);
 
             if ($data['action_type'] == ActionType::Create->name || $data['action_type'] == ActionType::Update->name) {
